@@ -3,6 +3,8 @@ package com.example.address_book.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -18,6 +20,12 @@ public class User {
     @Column(unique = true, nullable = false)
     private String username;
 
+    @Column(nullable = false, unique = true)
+    private String email;
+
     @Column(nullable = false)
     private String password;
+
+    private String resetToken;
+    private LocalDateTime tokenExpiry;
 }
