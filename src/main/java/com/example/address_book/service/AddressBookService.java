@@ -109,6 +109,7 @@ package com.example.address_book.service;
 import com.example.address_book.dto.AddressBookDTO;
 import com.example.address_book.model.AddressBook;
 import com.example.address_book.repository.AddressBookRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -118,6 +119,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j // ✅ Lombok for Logging
 @Service
 public class AddressBookService implements IAddressBookService {
 
@@ -134,6 +136,7 @@ public class AddressBookService implements IAddressBookService {
     @Override
     @Cacheable(value = "contacts") // ✅ Cache the list of contacts
     public List<AddressBookDTO> getAllContacts() {
+        log.info("Fetching all contacts from database");
         return repository.findAll().stream()
                 .map(contact -> modelMapper.map(contact, AddressBookDTO.class))
                 .collect(Collectors.toList());
@@ -142,6 +145,7 @@ public class AddressBookService implements IAddressBookService {
     @Override
     @Cacheable(value = "contact", key = "#id") // ✅ Cache a single contact
     public AddressBookDTO getContactById(Long id) {
+        log.info("Fetching contact with ID: {}", id);
         Optional<AddressBook> contact = repository.findById(id);
         return contact.map(c -> modelMapper.map(c, AddressBookDTO.class)).orElse(null);
     }
@@ -149,11 +153,13 @@ public class AddressBookService implements IAddressBookService {
     @Override
     @CacheEvict(value = {"contacts", "contact"}, allEntries = true) // ✅ Clear cache when adding
     public AddressBookDTO createContact(AddressBookDTO contactDTO) {
+        log.info("Creating new contact: {}", contactDTO.getName());
         AddressBook contact = modelMapper.map(contactDTO, AddressBook.class);
         AddressBook savedContact = repository.save(contact);
 
         // 📩 Publish event when a new contact is added
         rabbitMQPublisher.sendMessage("contact.added.queue", "New Contact Added: " + contactDTO.getName());
+        log.info("New contact added and event published: {}", contactDTO.getName());
 
         return modelMapper.map(savedContact, AddressBookDTO.class);
     }
@@ -161,6 +167,7 @@ public class AddressBookService implements IAddressBookService {
     @Override
     @CacheEvict(value = {"contacts", "contact"}, allEntries = true) // ✅ Clear cache when updating
     public AddressBookDTO updateContact(Long id, AddressBookDTO contactDTO) {
+        log.info("Updating contact with ID: {}", id);
         if (repository.existsById(id)) {
             AddressBook contact = modelMapper.map(contactDTO, AddressBook.class);
             contact.setId(id);
@@ -168,20 +175,26 @@ public class AddressBookService implements IAddressBookService {
 
             // 📩 Publish event when a contact is updated
             rabbitMQPublisher.sendMessage("contact.updated.queue", "Contact Updated: " + contactDTO.getName());
+            log.info("Contact updated and event published: {}", contactDTO.getName());
 
             return modelMapper.map(updatedContact, AddressBookDTO.class);
         }
+        log.warn("No contact found with ID: {}", id);
         return null;
     }
 
     @Override
     @CacheEvict(value = {"contacts", "contact"}, allEntries = true) // ✅ Clear cache when deleting
     public void deleteContact(Long id) {
+        log.info("Deleting contact with ID: {}", id);
         if (repository.existsById(id)) {
             repository.deleteById(id);
 
             // 📩 Publish event when a contact is deleted
             rabbitMQPublisher.sendMessage("contact.deleted.queue", "Contact Deleted with ID: " + id);
+            log.info("Contact deleted and event published: {}", id);
+        } else {
+            log.warn("Attempted to delete non-existing contact with ID: {}", id);
         }
     }
 }
