@@ -1,8 +1,10 @@
 package com.example.address_book.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import java.io.Serializable;
 
-public class AddressBookDTO {
+public class AddressBookDTO implements Serializable {
+    private static final long serialVersionUID = 1L;
     private String name;
     private String phone;
     private String address;

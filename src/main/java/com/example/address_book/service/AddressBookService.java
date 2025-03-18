@@ -110,7 +110,10 @@ import com.example.address_book.dto.AddressBookDTO;
 import com.example.address_book.model.AddressBook;
 import com.example.address_book.repository.AddressBookRepository;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -120,7 +123,7 @@ public class AddressBookService implements IAddressBookService {
 
     private AddressBookRepository repository;
     private ModelMapper modelMapper;
-    private RabbitMQPublisher rabbitMQPublisher; // ✅ RabbitMQ Publisher Added
+    private RabbitMQPublisher rabbitMQPublisher;
 
     public AddressBookService(AddressBookRepository repository, ModelMapper modelMapper, RabbitMQPublisher rabbitMQPublisher) {
         this.repository = repository;
@@ -129,6 +132,7 @@ public class AddressBookService implements IAddressBookService {
     }
 
     @Override
+    @Cacheable(value = "contacts") // ✅ Cache the list of contacts
     public List<AddressBookDTO> getAllContacts() {
         return repository.findAll().stream()
                 .map(contact -> modelMapper.map(contact, AddressBookDTO.class))
@@ -136,12 +140,14 @@ public class AddressBookService implements IAddressBookService {
     }
 
     @Override
+    @Cacheable(value = "contact", key = "#id") // ✅ Cache a single contact
     public AddressBookDTO getContactById(Long id) {
         Optional<AddressBook> contact = repository.findById(id);
         return contact.map(c -> modelMapper.map(c, AddressBookDTO.class)).orElse(null);
     }
 
     @Override
+    @CacheEvict(value = {"contacts", "contact"}, allEntries = true) // ✅ Clear cache when adding
     public AddressBookDTO createContact(AddressBookDTO contactDTO) {
         AddressBook contact = modelMapper.map(contactDTO, AddressBook.class);
         AddressBook savedContact = repository.save(contact);
@@ -153,6 +159,7 @@ public class AddressBookService implements IAddressBookService {
     }
 
     @Override
+    @CacheEvict(value = {"contacts", "contact"}, allEntries = true) // ✅ Clear cache when updating
     public AddressBookDTO updateContact(Long id, AddressBookDTO contactDTO) {
         if (repository.existsById(id)) {
             AddressBook contact = modelMapper.map(contactDTO, AddressBook.class);
@@ -168,6 +175,7 @@ public class AddressBookService implements IAddressBookService {
     }
 
     @Override
+    @CacheEvict(value = {"contacts", "contact"}, allEntries = true) // ✅ Clear cache when deleting
     public void deleteContact(Long id) {
         if (repository.existsById(id)) {
             repository.deleteById(id);
@@ -177,3 +185,4 @@ public class AddressBookService implements IAddressBookService {
         }
     }
 }
+
