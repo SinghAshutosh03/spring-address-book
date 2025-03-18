@@ -1,5 +1,7 @@
 package com.example.address_book.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class AddressBookDTO {
     private String name;
     private String phone;

@@ -59,13 +59,15 @@ public class AuthService {
     private UserRepository userRepository;
     private PasswordEncoder passwordEncoder;
     private JwtUtil jwtUtil;
-    private JavaMailSender mailSender; // ✅ Added JavaMailSender for sending emails
+    private JavaMailSender mailSender;
+    private RabbitMQPublisher rabbitMQPublisher; // ✅ RabbitMQ Publisher Added
 
-    public AuthService(UserRepository userRepository, JwtUtil jwtUtil, JavaMailSender mailSender) {
+    public AuthService(UserRepository userRepository, JwtUtil jwtUtil, JavaMailSender mailSender, RabbitMQPublisher rabbitMQPublisher) {
         this.userRepository = userRepository;
         this.passwordEncoder = new BCryptPasswordEncoder();
         this.jwtUtil = jwtUtil;
         this.mailSender = mailSender;
+        this.rabbitMQPublisher = rabbitMQPublisher;
     }
 
     public User registerUser(UserDTO userDTO) {
@@ -82,7 +84,12 @@ public class AuthService {
         user.setEmail(userDTO.getEmail());
         user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        // 📩 Publish event when a new user registers
+        rabbitMQPublisher.sendMessage("user.registration.queue", "New User Registered: " + userDTO.getUsername());
+
+        return savedUser;
     }
 
     public String loginUser(String username, String password) {
@@ -109,6 +116,9 @@ public class AuthService {
         user.setTokenExpiry(LocalDateTime.now().plusHours(1)); // ✅ Expire in 1 hour
 
         userRepository.save(user);
+
+        // ✅ Publish event when a password reset request is made
+        rabbitMQPublisher.sendMessage("password.reset.queue", "Password Reset Requested for: " + email);
 
         sendResetEmail(email, resetToken); // ✅ Send token via email
     }
@@ -146,5 +156,8 @@ public class AuthService {
         user.setTokenExpiry(null);
 
         userRepository.save(user);
+
+        // ✅ Publish event when password is successfully reset
+        rabbitMQPublisher.sendMessage("password.reset.success.queue", "Password Reset Successful for: " + user.getEmail());
     }
 }
